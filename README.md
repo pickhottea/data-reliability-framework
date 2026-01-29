@@ -17,6 +17,7 @@ Project F focuses on building the **controls and evidence layer** that makes dat
 
 Project F is a complete governance framework with concrete reliability artifacts:
 
+
 | Capability | Deliverable File |
 |-----------|------------------|
 | **F1 — Data Lifecycle Governance** | [`01-data-lifecycle.md`](./01-data-lifecycle.md) |
@@ -51,6 +52,7 @@ This extension demonstrates how reliability controls produce governance evidence
 ## 🚀 Extension Roadmap (Projects 1–3)
 
 After completing Project F, the framework can be extended in three applied directions:
+![Project Roadmap](./assets/project-roadmap.png)
 
 ### **Project 1 — Streaming SQL Reliability**
 Real-time quality enforcement and decision-readiness validation using SQL.
