@@ -38,7 +38,7 @@ Monitoring & Evidence
 Incident Response
    ↓
 Continuous Improvement
-
+```
 ---
 
 ## Lifecycle Stages (With Evidence)
@@ -171,6 +171,7 @@ Project F artifacts align directly to lifecycle governance:
 
 ---
 
+```text
 DQ Rule Failure (F2)
      ↓
 Alert Fired (F3)
@@ -182,6 +183,7 @@ Metadata + Lineage Context (F6)
 Contract Version Referenced (F5)
      ↓
 Corrective Action → Control Improvement
+```
 
 ---
 
