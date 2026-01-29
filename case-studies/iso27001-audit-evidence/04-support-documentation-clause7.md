@@ -61,3 +61,4 @@ Governance controls are usable, not theoretical.
 Project F demonstrates Clause 7 through structured documentation and operational readiness.
 
 ---
+
