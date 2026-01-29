@@ -54,6 +54,9 @@ This extension demonstrates how reliability controls produce governance evidence
 After completing Project F, the framework can be extended in three applied directions:
 ![Project Roadmap](./assets/project-roadmap.png)
 
+*Figure: Project F governance framework with three applied extension paths (SQL, ELK evidence automation, and business intent preservation case study).*
+
+
 ### **Project 1 — Streaming SQL Reliability**
 Real-time quality enforcement and decision-readiness validation using SQL.
 
