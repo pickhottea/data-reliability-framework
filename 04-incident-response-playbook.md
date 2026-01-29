@@ -154,5 +154,5 @@ Ticket should include:
 > Reliability is not the absence of incidents.  
 > Reliability is the ability to respond, prove, and improve.
 
-This playbook
+This playbook is the operational backbone of Project F.
 
