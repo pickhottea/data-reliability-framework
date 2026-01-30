@@ -68,12 +68,6 @@ Governance validation across transformations using **Marquez + OpenLineage**.
 
 ---
 
-### Roadmap Overview
-
-![Project Roadmap](./assets/project-roadmap.png)
-
----
-
 ## Why This Portfolio Matters
 
 This work is not about collecting tools.
