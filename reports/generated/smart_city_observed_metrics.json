@@ -1,0 +1,71 @@
+{
+  "status_date": "2026-04-11",
+  "repo_root": "/home/pickhottea/data-reliability-framework",
+  "evidence_root": "/home/pickhottea/data-reliability-framework/evidence/smart-city",
+  "run_status": {
+    "source_file": "/home/pickhottea/data-reliability-framework/evidence/smart-city/pipeline_run_log.csv/part-00000-56e1c0e0-38c0-4886-8c42-c878de1046b6-c000.csv",
+    "valid_rows": 43,
+    "filtered_invalid_rows": 65,
+    "status_counts": {
+      "failed": 30,
+      "running": 1,
+      "success": 12
+    },
+    "runs_with_nonzero_error_count": 40
+  },
+  "error_log": {
+    "source_file": "/home/pickhottea/data-reliability-framework/evidence/smart-city/error_log.csv/part-00000-2135e116-f4dd-494b-bf2d-15ff599f8bd3-c000.csv",
+    "valid_rows": 11,
+    "filtered_invalid_rows": 66,
+    "by_step_name": {
+      "build_telemetry_metrics": 3,
+      "build_silver_table": 5,
+      "build_gold_hourly_table": 3
+    },
+    "by_error_type": {
+      "AnalysisException": 6,
+      "ValueError": 2,
+      "DateTimeException": 1,
+      "NameError": 2
+    },
+    "severity_retryable": {
+      "critical|false": 11
+    },
+    "top_step_error_pairs": {
+      "build_gold_hourly_table|AnalysisException": 3,
+      "build_telemetry_metrics|AnalysisException": 2,
+      "build_silver_table|ValueError": 2,
+      "build_silver_table|NameError": 2,
+      "build_telemetry_metrics|DateTimeException": 1,
+      "build_silver_table|AnalysisException": 1
+    }
+  },
+  "freshness": {
+    "source_file": "/home/pickhottea/data-reliability-framework/evidence/smart-city/freshness_metrics.csv/part-00000-9f8cd18e-aa88-42b4-8885-9dc93931a872-c000.csv",
+    "valid_rows": 8,
+    "filtered_invalid_rows": 0,
+    "freshness_status_counts": {
+      "stale": 8
+    },
+    "lag_minutes": {
+      "count": 8,
+      "min": 273171.5,
+      "avg": 409828.51,
+      "max": 638303.3
+    }
+  },
+  "quality": {
+    "source_file": "/home/pickhottea/data-reliability-framework/evidence/smart-city/quality_metrics_daily.csv/part-00000-e24116e8-b735-40d4-9a95-7a93a3fab857-c000.csv",
+    "valid_rows": 5834,
+    "filtered_invalid_rows": 0,
+    "quality_status_counts": {
+      "pass": 5834
+    },
+    "averages": {
+      "pass_rate": 1.0,
+      "rejected_rate": 0.0,
+      "duplicate_rate": 0.0,
+      "flagged_rate": 0.0
+    }
+  }
+}

@@ -1,313 +1,217 @@
 domain_id: smart_city
 domain_name: smart_city_air_quality
-scorecard_version: v1
+scorecard_version: v3
 status_date: 2026-04-11
 scope: pilot
+
 evidence_root: evidence/smart-city
-
-evidence_sources:
-  pipeline_run_log:
-    path: evidence/smart-city/pipeline_run_log.csv
-    grain: run
-    columns:
-      - run_id
-      - trace_id
-      - pipeline_name
-      - started_at
-      - finished_at
-      - duration_ms
-      - status
-      - rows_in
-      - rows_out
-      - rows_flagged
-      - rows_rejected
-      - error_count
-      - artifact_path
-      - error_message
-
-  quality_metrics_daily:
-    path: evidence/smart-city/quality_metrics_daily.csv
-    grain: metric_date_city_pollutant
-    columns:
-      - metric_date
-      - run_id
-      - city
-      - pollutant
-      - total_records
-      - null_rate
-      - duplicate_rate
-      - stale_rate
-      - outlier_rate
-      - flagged_rate
-      - rejected_rate
-      - pass_rate
-      - quality_status
-
-  freshness_metrics:
-    path: evidence/smart-city/freshness_metrics.csv
-    grain: metric_ts_city_pollutant
-    columns:
-      - metric_ts
-      - run_id
-      - city
-      - pollutant
-      - latest_observed_at
-      - latest_ingested_at
-      - freshness_lag_minutes
-      - freshness_status
-
-  error_log:
-    path: evidence/smart-city/error_log.csv
-    grain: error_event
-    columns:
-      - error_ts
-      - run_id
-      - trace_id
-      - span_id
-      - pipeline_name
-      - step_name
-      - city
-      - pollutant
-      - batch_month
-      - source_name
-      - error_type
-      - error_message
-      - retryable
-      - severity
-
-  runtime:
-    path: evidence/smart-city/runtime
-    files:
-      - run_events.jsonl
-      - span_events.jsonl
-      - metric_events.jsonl
-      - error_events.jsonl
+analysis_artifacts:
+  script: scripts/analyze_smart_city_telemetry.py
+  observed_metrics_report: reports/smart_city_observed_metrics.md
+  observed_metrics_json: reports/generated/smart_city_observed_metrics.json
 
 overall_status:
   current: amber
   rationale:
-    - "The domain now emits governance-usable telemetry, quality, freshness, and error evidence."
-    - "Operational failures are present in run-level evidence."
-    - "Freshness evidence shows stale conditions and very large lag values in the reviewed sample."
-    - "Quality rows sampled look healthy, but full-period aggregation is still required."
+    - "Operational failures materially exceed successful runs in the cleaned run snapshot."
+    - "Freshness is currently a red-domain concern."
+    - "Quality metrics are strong in the current evidence snapshot."
+    - "Evidence normalization is still required for malformed run and error rows."
+
+observed_metrics:
+  operational:
+    valid_run_rows: 43
+    filtered_invalid_run_rows: 65
+    run_status_counts:
+      failed: 30
+      success: 12
+      running: 1
+    runs_with_nonzero_error_count: 40
+
+  errors:
+    valid_error_rows: 11
+    filtered_invalid_error_rows: 66
+    by_step_name:
+      build_silver_table: 5
+      build_telemetry_metrics: 3
+      build_gold_hourly_table: 3
+    by_error_type:
+      AnalysisException: 6
+      ValueError: 2
+      NameError: 2
+      DateTimeException: 1
+    severity_retryable:
+      critical_false: 11
+    top_step_error_pairs:
+      build_gold_hourly_table_AnalysisException: 3
+      build_telemetry_metrics_AnalysisException: 2
+      build_silver_table_ValueError: 2
+      build_silver_table_NameError: 2
+      build_telemetry_metrics_DateTimeException: 1
+      build_silver_table_AnalysisException: 1
+
+  freshness:
+    valid_rows: 8
+    filtered_invalid_rows: 0
+    freshness_status_counts:
+      stale: 8
+    lag_minutes:
+      count: 8
+      min: 273171.50
+      avg: 409828.51
+      max: 638303.30
+
+  quality:
+    valid_rows: 5834
+    filtered_invalid_rows: 0
+    quality_status_counts:
+      pass: 5834
+    averages:
+      pass_rate: 1.0
+      rejected_rate: 0.0
+      duplicate_rate: 0.0
+      flagged_rate: 0.0
 
 dimensions:
   operational_reliability:
-    objective: Pipeline runs successfully and completes expected processing stages.
     status: amber
-    rationale:
-      - "pipeline_run_log contains failed runs."
-      - "error_log contains critical errors."
-    evidence:
-      - pipeline_run_log
-      - error_log
-    indicators:
-      run_status:
-        source: pipeline_run_log.status
-        rule:
-          healthy_value: succeeded
-          risk_value: failed
-        interpretation:
-          green: "No failed runs in the reporting window."
-          amber: "At least one failed run in the reporting window."
-          red: "Repeated failed runs or failure cluster in the reporting window."
-      run_duration_ms:
-        source: pipeline_run_log.duration_ms
-        interpretation:
-          green: "Runtime stable relative to recent runs."
-          amber: "Runtime shows noticeable volatility or slowdown."
-          red: "Runtime degradation materially affects pipeline reliability."
-      run_error_count:
-        source: pipeline_run_log.error_count
-        interpretation:
-          green: "0 errors recorded for the run."
-          amber: "Non-zero errors recorded for isolated runs."
-          red: "Repeated non-zero errors across runs."
-      critical_error_presence:
-        source: error_log.severity
-        rule:
-          risk_value: critical
-        interpretation:
-          green: "No critical errors present."
-          amber: "Critical errors present but isolated."
-          red: "Critical errors recurring or blocking core processing."
+    decision_note: >
+      Operational reliability is materially unstable in the current cleaned snapshot.
+      Failed runs substantially outnumber successful runs, and many runs carry non-zero
+      error_count. The dominant hotspot is build_silver_table.
+    supporting_metrics:
+      - "valid run rows = 43"
+      - "failed runs = 30"
+      - "success runs = 12"
+      - "runs with non-zero error_count = 40"
+      - "top failed step = build_silver_table (5)"
+    governance_implication:
+      - "Retain Smart City as a governed pilot domain under active operational review."
+      - "Do not characterize the domain as operationally stable."
 
   data_quality:
-    objective: Curated data remains usable and within expected quality tolerances.
-    status: amber
-    rationale:
-      - "Sample rows in quality_metrics_daily look healthy."
-      - "Final status should be confirmed by aggregate review, not samples alone."
-    evidence:
-      - quality_metrics_daily
-    indicators:
-      quality_status:
-        source: quality_metrics_daily.quality_status
-        rule:
-          healthy_value: pass
-          risk_value: fail
-        interpretation:
-          green: "All or nearly all reviewed rows are pass."
-          amber: "Some fail states or quality deterioration observed."
-          red: "Material and persistent fail states observed."
-      pass_rate:
-        source: quality_metrics_daily.pass_rate
-        target: ">= 0.98"
-        interpretation:
-          green: "Pass rate meets or exceeds 0.98."
-          amber: "Pass rate below 0.98 but above severe threshold."
-          red: "Pass rate materially below acceptable tolerance."
-      rejected_rate:
-        source: quality_metrics_daily.rejected_rate
-        target: "<= 0.02"
-        interpretation:
-          green: "Rejected rate at or below 0.02."
-          amber: "Rejected rate above 0.02."
-          red: "Rejected rate materially above 0.02 or worsening across days."
-      duplicate_rate:
-        source: quality_metrics_daily.duplicate_rate
-        target: "<= 0.01"
-        interpretation:
-          green: "Duplicate rate at or below 0.01."
-          amber: "Duplicate rate above 0.01."
-          red: "Duplicate rate materially above 0.01 or recurring across cities/pollutants."
-      null_rate:
-        source: quality_metrics_daily.null_rate
-        interpretation:
-          green: "Null rate stable and near zero."
-          amber: "Null rate elevated for some city/pollutant combinations."
-          red: "Null rate materially affects usability."
-      stale_rate:
-        source: quality_metrics_daily.stale_rate
-        interpretation:
-          green: "No meaningful stale-rate signal in daily quality output."
-          amber: "Stale-rate signal present in some segments."
-          red: "Stale-rate broadly elevated."
-      outlier_rate:
-        source: quality_metrics_daily.outlier_rate
-        interpretation:
-          green: "Outlier rate within expected tolerance."
-          amber: "Outlier rate elevated."
-          red: "Outlier rate materially elevated or persistent."
-      flagged_rate:
-        source: quality_metrics_daily.flagged_rate
-        interpretation:
-          green: "Flagged rate stable and low."
-          amber: "Flagged rate rising or elevated."
-          red: "Flagged rate materially elevated and unresolved."
+    status: green
+    decision_note: >
+      Quality evidence is strong in the current snapshot. All valid reviewed quality
+      rows are pass, and average rejected, duplicate, and flagged rates are zero.
+    supporting_metrics:
+      - "valid quality rows = 5834"
+      - "quality_status pass = 5834"
+      - "avg pass_rate = 1.0"
+      - "avg rejected_rate = 0.0"
+      - "avg duplicate_rate = 0.0"
+      - "avg flagged_rate = 0.0"
+    governance_implication:
+      - "Retain a positive quality posture in the scorecard."
+      - "Continue to review quality separately from timeliness."
 
   freshness:
-    objective: Data remains timely enough for downstream trust and use.
     status: red
-    rationale:
-      - "freshness_metrics sample rows show freshness_status = stale."
-      - "freshness_lag_minutes values in the sample are extremely high."
-    evidence:
-      - freshness_metrics
-    indicators:
-      freshness_status:
-        source: freshness_metrics.freshness_status
-        rule:
-          healthy_value: fresh
-          risk_value: stale
-        interpretation:
-          green: "Rows are fresh or within acceptable tolerance."
-          amber: "Some stale rows present."
-          red: "Stale rows widespread or persistent."
-      freshness_lag_minutes:
-        source: freshness_metrics.freshness_lag_minutes
-        target: "<= 1440"
-        interpretation:
-          green: "Lag is at or below 1440 minutes."
-          amber: "Lag exceeds 1440 minutes."
-          red: "Lag is materially above tolerance or persistent across reviewed rows."
+    decision_note: >
+      Freshness is currently outside acceptable governance tolerance. All valid
+      reviewed freshness rows are stale, and lag values are extremely high.
+    supporting_metrics:
+      - "valid freshness rows = 8"
+      - "stale rows = 8"
+      - "avg freshness_lag_minutes = 409828.51"
+      - "max freshness_lag_minutes = 638303.30"
+    governance_implication:
+      - "Retain a Red freshness exception."
+      - "Do not allow timeliness risk to be masked by operational or quality positives."
 
   incident_and_exception_management:
-    objective: Operational failures are visible, classifiable, and reviewable.
+    status: amber_red
+    decision_note: >
+      All valid cleaned error rows are critical and non-retryable. Repeated failures
+      are clustered across Silver, Gold dependency handling, and telemetry metrics generation.
+    supporting_metrics:
+      - "valid error rows = 11"
+      - "critical non-retryable errors = 11"
+      - "AnalysisException = 6"
+      - "build_silver_table = 5"
+      - "build_telemetry_metrics = 3"
+      - "build_gold_hourly_table = 3"
+    governance_implication:
+      - "Keep active exception tracking in place."
+      - "Escalate recurring critical failures as incident candidates when needed."
+
+  evidence_integrity:
     status: amber
-    rationale:
-      - "error_log already provides severity and retryable fields."
-      - "Exception workflow is now possible, but not yet fully operationalized."
-    evidence:
-      - error_log
-      - runtime
-    indicators:
-      severity:
-        source: error_log.severity
-        interpretation:
-          green: "No critical severity errors."
-          amber: "Critical severity exists but appears isolated."
-          red: "Critical severity errors recur or block pipeline operation."
-      retryable:
-        source: error_log.retryable
-        interpretation:
-          green: "Most errors are retryable or transient."
-          amber: "Some non-retryable errors exist."
-          red: "Critical non-retryable errors recur."
-      error_type:
-        source: error_log.error_type
-        interpretation:
-          green: "No recurring harmful pattern."
-          amber: "Recurring error types require monitoring."
-          red: "Recurring error types indicate unresolved systemic defect."
-      step_name:
-        source: error_log.step_name
-        interpretation:
-          green: "No stage repeatedly implicated."
-          amber: "Some stages show repeated failure."
-          red: "A core stage repeatedly fails and blocks reliability."
+    decision_note: >
+      The analysis successfully filtered malformed rows, but evidence normalization
+      remains necessary because invalid run and error rows are still materially present.
+    supporting_metrics:
+      - "filtered invalid run rows = 65"
+      - "filtered invalid error rows = 66"
+    governance_implication:
+      - "Use cleaned metrics for governance interpretation."
+      - "Improve telemetry-derived CSV integrity before stronger executive reporting."
 
-observed_sample_signals:
-  pipeline_run_log:
-    observed_status_values:
-      - failed
-    observed_notes:
-      - "Sample failed runs exist."
-      - "Observed messages include missing pollutant columns and Spark internal error output."
+active_exceptions:
+  - exception_id: SC-EX-001
+    title: Freshness stale condition across reviewed outputs
+    status: open
+    severity: red
 
-  quality_metrics_daily:
-    observed_quality_status_values:
-      - pass
-    observed_notes:
-      - "Sample rows show pass_rate = 1.0."
-      - "Sample rows show null_rate, duplicate_rate, stale_rate, outlier_rate, flagged_rate, rejected_rate = 0.0."
+  - exception_id: SC-EX-002
+    title: Repeated Silver-stage failures
+    status: open
+    severity: amber
 
-  freshness_metrics:
-    observed_freshness_status_values:
-      - stale
-    observed_notes:
-      - "Sample rows show very high freshness_lag_minutes."
-      - "Sample rows are marked stale."
+  - exception_id: SC-EX-003
+    title: Gold dependency failure due to missing Silver artifact
+    status: open
+    severity: amber
 
-  error_log:
-    observed_error_types:
-      - AnalysisException
-      - ValueError
-    observed_severity_values:
-      - critical
-    observed_retryable_values:
-      - false
-    observed_notes:
-      - "Sample rows include unresolved-column failure."
-      - "Sample rows include missing pollutant-column failure."
+  - exception_id: SC-EX-004
+    title: Telemetry rollup correctness instability
+    status: open
+    severity: amber
 
-review_actions:
-  immediate:
-    - "Aggregate pipeline_run_log by status to compute run success rate."
-    - "Aggregate quality_metrics_daily by metric_date to compute daily pass and reject trends."
-    - "Aggregate freshness_metrics by city and pollutant to identify worst stale segments."
-    - "Group error_log by step_name, error_type, severity, and retryable."
-  next:
-    - "Populate observed values into this scorecard."
-    - "Link exception rules directly to stale freshness, failed runs, and critical non-retryable errors."
-    - "Prepare first monthly governance board pack."
+  - exception_id: SC-EX-005
+    title: Critical non-retryable failures present in error evidence
+    status: open
+    severity: red
 
-owners:
-  governance_owner: tbd
-  technical_owner: tbd
-  domain_owner: tbd
+  - exception_id: SC-EX-006
+    title: Evidence integrity concerns in curated run history
+    status: monitoring
+    severity: amber
 
-review_cycle:
+review_decisions:
+  - "Retain overall status as Amber."
+  - "Retain Data Quality as Green."
+  - "Retain Freshness as Red."
+  - "Retain Silver-stage instability as the primary operational hotspot."
+  - "Retain telemetry correctness instability as a governance-visible concern."
+  - "Retain evidence normalization as an active follow-up item."
+
+required_actions:
+  - action: "Investigate and reduce recurrent Silver-stage failures."
+    owner: tbd
+    due_date: tbd
+
+  - action: "Review stale freshness conditions by city and pollutant."
+    owner: tbd
+    due_date: tbd
+
+  - action: "Review telemetry metric generation failures as a separate observability risk."
+    owner: tbd
+    due_date: tbd
+
+  - action: "Improve telemetry-derived CSV normalization and row integrity."
+    owner: tbd
+    due_date: tbd
+
+  - action: "Refresh the scorecard after the next telemetry snapshot."
+    owner: tbd
+    due_date: tbd
+
+next_review:
   frequency: monthly
-  current_phase: pilot
-  next_review: tbd
+  next_focus:
+    - "freshness trend"
+    - "Silver-stage recurrence"
+    - "critical non-retryable failure recurrence"
+    - "telemetry rollup stability"
+    - "evidence normalization quality"
