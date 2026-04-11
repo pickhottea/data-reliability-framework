@@ -86,9 +86,15 @@ Project F demonstrates how reliable data systems are built through:
 
 ---
 
+## Upstream evidence sources
+
+This framework reviews telemetry, quality, and operational evidence produced by implementation repositories.
+
+One active upstream example is the Smart City air-quality platform, which emits runtime logs, span events, metric events, quality summaries, and structured failure evidence for downstream governance and ISO-aligned review.
+
 ## Author
 
-**Pi Hsin Tsai**  
+**pickhottea**  
 Focus: Data Reliability / Data Quality & Observability Engineering
 
 
