@@ -1,0 +1,387 @@
+domain_id: smart_city
+domain_name: smart_city_air_quality
+rules_version: v1
+status_date: 2026-04-11
+scope: pilot
+evidence_root: evidence/smart-city
+
+evidence_sources:
+  pipeline_run_log:
+    path: evidence/smart-city/pipeline_run_log.csv
+    columns:
+      - run_id
+      - trace_id
+      - pipeline_name
+      - started_at
+      - finished_at
+      - duration_ms
+      - status
+      - rows_in
+      - rows_out
+      - rows_flagged
+      - rows_rejected
+      - error_count
+      - artifact_path
+      - error_message
+
+  quality_metrics_daily:
+    path: evidence/smart-city/quality_metrics_daily.csv
+    columns:
+      - metric_date
+      - run_id
+      - city
+      - pollutant
+      - total_records
+      - null_rate
+      - duplicate_rate
+      - stale_rate
+      - outlier_rate
+      - flagged_rate
+      - rejected_rate
+      - pass_rate
+      - quality_status
+
+  freshness_metrics:
+    path: evidence/smart-city/freshness_metrics.csv
+    columns:
+      - metric_ts
+      - run_id
+      - city
+      - pollutant
+      - latest_observed_at
+      - latest_ingested_at
+      - freshness_lag_minutes
+      - freshness_status
+
+  error_log:
+    path: evidence/smart-city/error_log.csv
+    columns:
+      - error_ts
+      - run_id
+      - trace_id
+      - span_id
+      - pipeline_name
+      - step_name
+      - city
+      - pollutant
+      - batch_month
+      - source_name
+      - error_type
+      - error_message
+      - retryable
+      - severity
+
+rule_groups:
+  operational_reliability:
+    - rule_id: SC-OPS-001
+      name: failed_run_detected
+      description: Open an operational exception when pipeline_run_log contains failed runs.
+      source: pipeline_run_log
+      fields:
+        - status
+        - run_id
+        - error_count
+        - error_message
+      condition:
+        expression: "status == failed"
+      severity: amber
+      governance_action:
+        - Open operational exception review
+        - Record failed run_id and associated error_message
+        - Check whether failure is isolated or recurring
+      board_visibility: yes
+
+    - rule_id: SC-OPS-002
+      name: repeated_failed_runs
+      description: Escalate when failed runs recur within the reporting window.
+      source: pipeline_run_log
+      fields:
+        - status
+        - run_id
+        - started_at
+        - finished_at
+      condition:
+        expression: "count(status == failed) >= 2 within review window"
+      severity: red
+      governance_action:
+        - Escalate to incident review
+        - Require remediation owner
+        - Review upstream dependency and transform stability
+      board_visibility: yes
+
+    - rule_id: SC-OPS-003
+      name: run_level_error_count_present
+      description: Review runs that complete with non-zero error_count.
+      source: pipeline_run_log
+      fields:
+        - run_id
+        - status
+        - error_count
+      condition:
+        expression: "error_count > 0"
+      severity: amber
+      governance_action:
+        - Review whether errors align with failure or degraded success
+        - Track error_count trend by run
+      board_visibility: no
+
+  freshness:
+    - rule_id: SC-FRESH-001
+      name: stale_row_detected
+      description: Open freshness exception when freshness_status shows stale.
+      source: freshness_metrics
+      fields:
+        - metric_ts
+        - run_id
+        - city
+        - pollutant
+        - freshness_lag_minutes
+        - freshness_status
+      condition:
+        expression: "freshness_status == stale"
+      severity: amber
+      governance_action:
+        - Open freshness exception
+        - Identify affected city and pollutant combinations
+        - Review source latency versus ingestion latency
+      board_visibility: yes
+
+    - rule_id: SC-FRESH-002
+      name: freshness_lag_exceeds_daily_tolerance
+      description: Escalate when freshness lag exceeds one day.
+      source: freshness_metrics
+      fields:
+        - city
+        - pollutant
+        - freshness_lag_minutes
+      condition:
+        expression: "freshness_lag_minutes > 1440"
+      severity: amber
+      governance_action:
+        - Flag in monthly scorecard
+        - Review stale-data impact on downstream trust
+      board_visibility: yes
+
+    - rule_id: SC-FRESH-003
+      name: extreme_freshness_lag
+      description: Escalate severe timeliness risk when lag is materially above tolerance.
+      source: freshness_metrics
+      fields:
+        - city
+        - pollutant
+        - freshness_lag_minutes
+        - freshness_status
+      condition:
+        expression: "freshness_lag_minutes > 10080 or persistent freshness_status == stale"
+      severity: red
+      governance_action:
+        - Escalate to governance board review
+        - Require root cause analysis
+        - Decide whether downstream reliability claims need qualification
+      board_visibility: yes
+
+  data_quality:
+    - rule_id: SC-QUAL-001
+      name: quality_status_fail_detected
+      description: Open quality exception when quality_status is fail.
+      source: quality_metrics_daily
+      fields:
+        - metric_date
+        - city
+        - pollutant
+        - quality_status
+      condition:
+        expression: "quality_status == fail"
+      severity: amber
+      governance_action:
+        - Open quality exception
+        - Review failing city and pollutant combinations
+      board_visibility: yes
+
+    - rule_id: SC-QUAL-002
+      name: rejected_rate_breach
+      description: Escalate when rejected_rate exceeds expected tolerance.
+      source: quality_metrics_daily
+      fields:
+        - metric_date
+        - city
+        - pollutant
+        - rejected_rate
+      condition:
+        expression: "rejected_rate > 0.02"
+      severity: amber
+      governance_action:
+        - Review transform and validation logic
+        - Track trend across days
+      board_visibility: yes
+
+    - rule_id: SC-QUAL-003
+      name: duplicate_rate_breach
+      description: Escalate when duplicate_rate exceeds expected tolerance.
+      source: quality_metrics_daily
+      fields:
+        - metric_date
+        - city
+        - pollutant
+        - duplicate_rate
+      condition:
+        expression: "duplicate_rate > 0.01"
+      severity: amber
+      governance_action:
+        - Review deduplication controls
+        - Check whether issue is source-specific or transform-specific
+      board_visibility: yes
+
+    - rule_id: SC-QUAL-004
+      name: pass_rate_drop
+      description: Escalate when pass_rate falls below expected threshold.
+      source: quality_metrics_daily
+      fields:
+        - metric_date
+        - city
+        - pollutant
+        - pass_rate
+      condition:
+        expression: "pass_rate < 0.98"
+      severity: amber
+      governance_action:
+        - Review quality failure composition
+        - Assess whether quality degradation is isolated or systemic
+      board_visibility: yes
+
+    - rule_id: SC-QUAL-005
+      name: flagged_rate_elevated
+      description: Review elevated flagged_rate even when records are not rejected.
+      source: quality_metrics_daily
+      fields:
+        - metric_date
+        - city
+        - pollutant
+        - flagged_rate
+      condition:
+        expression: "flagged_rate > 0.05"
+      severity: amber
+      governance_action:
+        - Monitor for drift
+        - Review whether flagged cases are accumulating unresolved risk
+      board_visibility: no
+
+    - rule_id: SC-QUAL-006
+      name: stale_or_outlier_signal_present
+      description: Review stale_rate or outlier_rate when non-zero values appear.
+      source: quality_metrics_daily
+      fields:
+        - metric_date
+        - city
+        - pollutant
+        - stale_rate
+        - outlier_rate
+      condition:
+        expression: "stale_rate > 0 or outlier_rate > 0"
+      severity: amber
+      governance_action:
+        - Review whether timeliness and statistical validity issues are spreading
+        - Link findings to freshness and anomaly review
+      board_visibility: no
+
+  incident_and_error_management:
+    - rule_id: SC-ERR-001
+      name: critical_error_detected
+      description: Open exception when error_log contains critical severity.
+      source: error_log
+      fields:
+        - error_ts
+        - run_id
+        - step_name
+        - error_type
+        - severity
+        - retryable
+      condition:
+        expression: "severity == critical"
+      severity: amber
+      governance_action:
+        - Open incident candidate review
+        - Identify impacted step_name and error_type
+        - Check for recurrence across runs
+      board_visibility: yes
+
+    - rule_id: SC-ERR-002
+      name: critical_non_retryable_error
+      description: Escalate when an error is both critical and non-retryable.
+      source: error_log
+      fields:
+        - error_ts
+        - run_id
+        - step_name
+        - error_type
+        - retryable
+        - severity
+        - error_message
+      condition:
+        expression: "severity == critical and retryable == false"
+      severity: red
+      governance_action:
+        - Escalate to formal incident review
+        - Require remediation owner and target closure date
+        - Review whether pipeline outputs should be treated as unreliable for affected run
+      board_visibility: yes
+
+    - rule_id: SC-ERR-003
+      name: recurring_error_type
+      description: Escalate when the same error_type recurs across the reporting window.
+      source: error_log
+      fields:
+        - error_type
+        - step_name
+        - run_id
+        - severity
+      condition:
+        expression: "count(same error_type) >= 3 within review window"
+      severity: red
+      governance_action:
+        - Treat as systemic defect candidate
+        - Review engineering fix versus governance exception acceptance
+      board_visibility: yes
+
+    - rule_id: SC-ERR-004
+      name: recurring_failed_step
+      description: Review repeated failures in the same pipeline step.
+      source: error_log
+      fields:
+        - step_name
+        - error_type
+        - run_id
+      condition:
+        expression: "count(same step_name) >= 2 within review window"
+      severity: amber
+      governance_action:
+        - Review step-level hardening priority
+        - Link repeated failures to root cause category
+      board_visibility: no
+
+review_process:
+  cadence: monthly
+  exception_owner: tbd
+  incident_owner: tbd
+  governance_owner: tbd
+
+  review_sequence:
+    - Review pipeline_run_log for failed runs and non-zero error_count
+    - Review freshness_metrics for stale rows and extreme lag
+    - Review quality_metrics_daily for threshold breaches
+    - Review error_log for critical, non-retryable, and recurring failures
+    - Escalate amber and red items into scorecard and board review
+
+outputs_supported:
+  - scorecards/smart_city_scorecard.yaml
+  - reports/smart_city_reliability_summary.md
+  - monthly governance board review
+  - pilot exception register
+
+current_observed_risks_from_sample:
+  - "pipeline_run_log sample includes failed runs"
+  - "freshness_metrics sample includes freshness_status = stale"
+  - "freshness_metrics sample includes very large freshness_lag_minutes values"
+  - "error_log sample includes severity = critical"
+  - "error_log sample includes retryable = false"
+  - "error_log sample includes AnalysisException and ValueError"
