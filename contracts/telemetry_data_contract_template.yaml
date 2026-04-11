@@ -1,0 +1,164 @@
+contract:
+  contract_id: telemetry_runtime_observability_v1
+  status: pilot
+  domain_id: urban_air_quality_runtime_observability
+
+  producer:
+    repo: smart-city-air-quality-platform
+    primary_branch: feature/smart-city-core-pipeline
+    contract_origin_branch: feature/runtime-observability-contract
+    owner_role: technical_owner
+
+  purpose: >
+    Define the minimum runtime telemetry contract for the Smart City air-quality
+    batch pipeline so that pipeline execution is observable, reviewable, and
+    suitable for governance review.
+
+  assets:
+    - asset_name: run_events
+      asset_type: runtime_event_stream
+      storage_path: data/telemetry/runtime/run_events.jsonl
+      required_fields:
+        - event_ts
+        - event_type
+        - run_id
+        - trace_id
+        - pipeline_name
+        - status
+      optional_fields:
+        - error_message
+        - artifact_path
+
+    - asset_name: span_events
+      asset_type: runtime_event_stream
+      storage_path: data/telemetry/runtime/span_events.jsonl
+      required_fields:
+        - event_ts
+        - event_type
+        - run_id
+        - trace_id
+        - span_id
+        - pipeline_name
+        - step_name
+        - status
+      optional_fields:
+        - parent_span_id
+        - city
+        - pollutant
+        - batch_month
+        - source_name
+        - rows_in
+        - rows_out
+        - artifact_path
+        - error_message
+
+    - asset_name: metric_events
+      asset_type: runtime_event_stream
+      storage_path: data/telemetry/runtime/metric_events.jsonl
+      required_fields:
+        - event_ts
+        - run_id
+        - trace_id
+        - pipeline_name
+        - metric_name
+        - metric_value
+        - metric_unit
+      optional_fields:
+        - step_name
+        - city
+        - pollutant
+        - batch_month
+        - source_name
+
+    - asset_name: error_events
+      asset_type: runtime_event_stream
+      storage_path: data/telemetry/runtime/error_events.jsonl
+      required_fields:
+        - event_ts
+        - run_id
+        - trace_id
+        - pipeline_name
+        - step_name
+        - error_type
+        - error_message
+      optional_fields:
+        - span_id
+        - city
+        - pollutant
+        - batch_month
+        - source_name
+        - retryable
+        - severity
+
+    - asset_name: curated_runtime_evidence
+      asset_type: curated_tables
+      storage_paths:
+        - data/telemetry/curated/pipeline_run_log.csv
+        - data/telemetry/curated/pipeline_trace.csv
+        - data/telemetry/curated/pipeline_metrics.csv
+        - data/telemetry/curated/quality_metrics_daily.csv
+        - data/telemetry/curated/freshness_metrics.csv
+        - data/telemetry/curated/error_log.csv
+
+  vocabularies:
+    run_status:
+      - running
+      - success
+      - failed
+      - partial_success
+      - incomplete
+    span_status:
+      - started
+      - success
+      - failed
+      - skipped
+    quality_status:
+      - pass
+      - warn
+      - fail
+    freshness_status:
+      - fresh
+      - delayed
+      - stale
+      - unknown
+    severity:
+      - info
+      - warning
+      - error
+      - critical
+
+  quality_rules:
+    - run_id and trace_id must be present for all runtime event streams
+    - step_name must be present for span_events and error_events
+    - required status values must conform to approved vocabularies
+    - event timestamps must be parseable as UTC timestamps
+    - critical failures must produce error_events when technically possible
+    - raw runtime evidence must exist before curated rollup is considered valid
+
+  delivery_expectations:
+    runtime_emission: during_execution
+    curated_rollup: same_pipeline_cycle
+    completeness_rule: >
+      A pipeline run is operationally valid only when runtime logs, spans,
+      metrics, and error streams are available for review.
+
+  freshness_expectations:
+    runtime_event_availability_slo: ">= 95% within 5 minutes of emission"
+    curated_rollup_slo: ">= 95% of completed runs rolled up within 30 minutes"
+
+  consumers:
+    - data-reliability-framework
+    - smart_city_pipeline_review
+    - governance_board_review
+    - exception_review
+
+  change_control:
+    contract_owner_role: technical_owner
+    reviewer_roles:
+      - data_steward
+      - reliability_reviewer
+    approval_required_for:
+      - breaking schema changes
+      - vocabulary changes
+      - SLO definition changes
+      - threshold changes affecting incident triggers

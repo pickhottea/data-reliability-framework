@@ -1,0 +1,54 @@
+domains:
+  - domain_id: urban_air_quality_runtime_observability
+    name: Urban Air Quality Runtime Observability
+    status: pilot
+    business_purpose: >
+      Monitor runtime health, data reliability, and analytical readiness for the
+      Smart City air-quality batch pipeline.
+    scope:
+      producer_repo: smart-city-air-quality-platform
+      producer_branch: feature/smart-city-core-pipeline
+      upstream_contract_branch: feature/runtime-observability-contract
+      source_systems:
+        - crate_grafana_proxy
+      primary_assets:
+        - bronze_city_pollutant_month_extracts
+        - silver_air_quality_long
+        - gold_hourly_air_quality
+        - gold_hourly_city_comparison
+        - gold_hourly_coverage
+        - telemetry_runtime_events
+        - telemetry_curated_evidence
+    ownership:
+      domain_owner: smart_city_domain_owner
+      data_steward: smart_city_data_steward
+      technical_owner: smart_city_pipeline_maintainer
+      reliability_reviewer: reliability_framework_reviewer
+    primary_consumers:
+      - smart_city_pipeline_operators
+      - reliability_framework
+      - governance_review
+      - exception_review
+    evidence_locations:
+      runtime:
+        - data/telemetry/runtime/run_events.jsonl
+        - data/telemetry/runtime/span_events.jsonl
+        - data/telemetry/runtime/metric_events.jsonl
+        - data/telemetry/runtime/error_events.jsonl
+      curated:
+        - data/telemetry/curated/pipeline_run_log.csv
+        - data/telemetry/curated/pipeline_trace.csv
+        - data/telemetry/curated/pipeline_metrics.csv
+        - data/telemetry/curated/quality_metrics_daily.csv
+        - data/telemetry/curated/freshness_metrics.csv
+        - data/telemetry/curated/error_log.csv
+    criticality: high
+    review_cadence: monthly
+    control_objectives:
+      - Pipeline runs are traceable end to end.
+      - Quality degradation is visible before downstream review.
+      - Freshness issues are surfaced for operational review.
+      - Failures and exception states are reviewable through structured evidence.
+    notes:
+      - This is the first governed domain in the reliability framework.
+      - Definitions are scoped to Smart City pilot operations, not enterprise-wide standardization yet.

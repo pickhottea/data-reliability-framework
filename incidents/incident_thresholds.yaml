@@ -1,0 +1,83 @@
+incident_thresholds:
+  - id: inc_run_completeness_breach
+    trigger: complete_run_rate < 0.95 over rolling 7-day window
+    severity: medium
+    immediate_action: open_incident
+    first_responder_role: technical_owner
+    escalation_role: reliability_reviewer
+    evidence_required:
+      - pipeline_run_log.csv
+      - pipeline_trace.csv
+      - pipeline_metrics.csv
+      - error_log.csv
+
+  - id: inc_freshness_breach
+    trigger: freshness_status in {delayed, stale} for critical city-pollutant stream in 2 consecutive windows
+    severity: medium
+    immediate_action: investigate_upstream_delay
+    first_responder_role: technical_owner
+    escalation_role: domain_owner
+    evidence_required:
+      - freshness_metrics.csv
+      - pipeline_trace.csv
+
+  - id: inc_quality_flag_spike
+    trigger: flagged_rate > 0.10 for any city-pollutant-day
+    severity: medium
+    immediate_action: open_exception_review
+    first_responder_role: data_steward
+    escalation_role: reliability_reviewer
+    evidence_required:
+      - quality_metrics_daily.csv
+
+  - id: inc_rejected_rate_spike
+    trigger: rejected_rate > 0.05 for any city-pollutant-day
+    severity: high
+    immediate_action: investigate_qc_regression
+    first_responder_role: data_steward
+    escalation_role: domain_owner
+    evidence_required:
+      - quality_metrics_daily.csv
+      - pipeline_trace.csv
+      - error_log.csv
+
+  - id: inc_missing_runtime_evidence
+    trigger: any completed business run missing one or more required runtime evidence streams
+    severity: high
+    immediate_action: mark_run_operationally_invalid
+    first_responder_role: technical_owner
+    escalation_role: reliability_reviewer
+    evidence_required:
+      - run_events.jsonl
+      - span_events.jsonl
+      - metric_events.jsonl
+      - error_events.jsonl
+
+  - id: inc_untraceable_critical_error
+    trigger: critical error record without valid run_id or trace_id
+    severity: high
+    immediate_action: block_governance_export
+    first_responder_role: reliability_reviewer
+    escalation_role: domain_owner
+    evidence_required:
+      - error_log.csv
+
+playbook_defaults:
+  incident_record_fields:
+    - incident_id
+    - opened_at
+    - threshold_id
+    - severity
+    - current_status
+    - first_responder
+    - evidence_links
+    - containment_action
+    - root_cause_summary
+    - corrective_action
+    - closure_due_date
+    - closure_evidence
+  close_conditions:
+    - threshold no longer breached
+    - root cause documented
+    - corrective action assigned or completed
+    - governance reviewer sign-off recorded for high severity incidents

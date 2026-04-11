@@ -1,0 +1,96 @@
+kpis:
+  - id: kpi_pipeline_run_completeness
+    name: Pipeline Run Completeness
+    description: Percentage of runs with all required runtime evidence streams present.
+    sli: complete_runs / total_runs
+    target_slo: ">= 0.95"
+    sla: "Monthly complete-run rate must remain at or above 95%"
+    owner_role: technical_owner
+    review_cadence: weekly
+    evidence_source:
+      - pipeline_run_log.csv
+      - pipeline_trace.csv
+      - pipeline_metrics.csv
+      - error_log.csv
+
+  - id: kpi_ingestion_freshness
+    name: Ingestion Freshness
+    description: Percentage of city-pollutant streams within acceptable freshness lag.
+    sli: fresh_streams / total_streams
+    target_slo: ">= 0.95"
+    sla: "Monthly freshness rate must remain at or above 95%"
+    owner_role: technical_owner
+    review_cadence: weekly
+    evidence_source:
+      - freshness_metrics.csv
+
+  - id: kpi_telemetry_completeness
+    name: Telemetry Completeness
+    description: Percentage of runtime events carrying required contract fields.
+    sli: contract_valid_events / total_events
+    target_slo: ">= 0.99"
+    owner_role: data_steward
+    review_cadence: weekly
+    evidence_source:
+      - metric_events.jsonl
+      - run_events.jsonl
+      - span_events.jsonl
+      - error_events.jsonl
+
+  - id: kpi_schema_compliance
+    name: Schema Compliance Rate
+    description: Percentage of curated telemetry records conforming to expected schema and vocabulary.
+    sli: compliant_records / total_records
+    target_slo: ">= 0.98"
+    owner_role: technical_owner
+    review_cadence: weekly
+    evidence_source:
+      - pipeline_run_log.csv
+      - pipeline_trace.csv
+      - pipeline_metrics.csv
+      - error_log.csv
+
+  - id: kpi_quality_flag_rate
+    name: Quality Flag Rate
+    description: Share of Silver records classified as flagged.
+    sli: flagged_records / total_records
+    target_slo: "<= 0.10"
+    owner_role: data_steward
+    review_cadence: weekly
+    evidence_source:
+      - quality_metrics_daily.csv
+
+  - id: kpi_rejected_rate
+    name: Rejected Record Rate
+    description: Share of Silver records classified as rejected.
+    sli: rejected_records / total_records
+    target_slo: "<= 0.05"
+    owner_role: data_steward
+    review_cadence: weekly
+    evidence_source:
+      - quality_metrics_daily.csv
+
+  - id: kpi_traceability
+    name: Critical Signal Traceability
+    description: Percentage of critical execution failures carrying run and trace identifiers.
+    sli: traceable_critical_errors / critical_errors
+    target_slo: ">= 1.00"
+    owner_role: reliability_reviewer
+    review_cadence: monthly
+    evidence_source:
+      - error_log.csv
+
+  - id: kpi_incident_closure_timeliness
+    name: Incident Closure Timeliness
+    description: Percentage of incidents closed within agreed due date.
+    sli: incidents_closed_on_time / incidents_total
+    target_slo: ">= 0.90"
+    owner_role: domain_owner
+    review_cadence: monthly
+    evidence_source:
+      - exception_review
+      - incident_register
+
+notes:
+  - This KPI catalog is scoped to the Smart City pilot domain.
+  - Convert pilot thresholds into cross-domain standards only after at least one additional producer domain is onboarded.
