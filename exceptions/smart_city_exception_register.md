@@ -21,6 +21,7 @@ This register is based on current evidence available in:
 - `evidence/smart-city/freshness_metrics.csv/`
 - `evidence/smart-city/error_log.csv/`
 - `evidence/smart-city/runtime/`
+- `reports/generated/smart_city_observed_metrics.json`
 
 ---
 
@@ -41,13 +42,18 @@ This register is based on current evidence available in:
 **Status**: Open  
 **Severity**: Red  
 **First observed**: 2026-04-08  
+**Last reviewed**: 2026-04-11  
+**Owner**: TBD  
+**Due date**: TBD  
 **Evidence sources**:
 - `freshness_metrics.csv`
-- `smart_city_reliability_summary.md`
+- `reports/smart_city_observed_metrics.md`
+- `reports/generated/smart_city_observed_metrics.json`
 
 **Observed signal**
-- `freshness_status = stale`
-- very large `freshness_lag_minutes` values in reviewed sample rows
+- `freshness_status = stale`: 8 valid rows
+- avg `freshness_lag_minutes`: 409828.51
+- max `freshness_lag_minutes`: 638303.30
 
 **Governance interpretation**
 Smart City may successfully emit telemetry and curated outputs while still failing timeliness expectations for downstream trust.
@@ -55,21 +61,25 @@ Smart City may successfully emit telemetry and curated outputs while still faili
 This is not only a run-level issue. It is a direct data usefulness and timeliness issue.
 
 **Risk statement**
-Downstream users may interpret Smart City outputs as current when the reviewed freshness evidence indicates stale conditions.
+Downstream users may interpret Smart City outputs as current when reviewed freshness evidence indicates severe stale conditions.
+
+**Current response**
+- freshness retained as explicit Red domain concern
+- issue kept separate from operational success/failure
 
 **Required review**
 - identify worst affected `city` / `pollutant` combinations
 - determine whether lag is source-driven, ingestion-driven, or transformation-driven
 - confirm whether stale outputs should block downstream trust claims
 
-**Suggested owner**
-- Domain owner: TBD
-- Technical owner: TBD
+**Closure criteria**
+- freshness no longer shows all-valid-row stale status
+- lag returns to an explicitly accepted threshold
+- governance review accepts timeliness posture as no longer Red
 
 **Next action**
 - aggregate `freshness_metrics.csv` by `city` and `pollutant`
-- identify persistence and spread of stale status
-- decide whether formal timeliness SLO breach should be declared
+- decide whether a formal timeliness SLO breach statement should be added to monthly review
 
 ---
 
@@ -79,38 +89,49 @@ Downstream users may interpret Smart City outputs as current when the reviewed f
 **Status**: Open  
 **Severity**: Amber  
 **First observed**: 2026-04-08  
+**Last reviewed**: 2026-04-11  
+**Owner**: TBD  
+**Due date**: TBD  
 **Evidence sources**:
 - `pipeline_run_log.csv`
 - `pipeline_trace.csv`
 - `error_log.csv`
 - `runtime/error_events.jsonl`
+- `reports/generated/smart_city_observed_metrics.json`
 
 **Observed signal**
-Repeated failures appear in `build_silver_table`, including:
-- missing pollutant-column assumptions
-- unresolved `_source_file`
+`build_silver_table` appears as the top cleaned step-level failure hotspot:
+- `build_silver_table`: 5 valid error rows
+
+Observed failure types include:
+- `ValueError`
 - `NameError`
-- Spark execution failure during count
+- `AnalysisException`
 
 **Governance interpretation**
-The Silver stage is a reliability-critical processing step and currently shows repeated instability.  
-Because downstream Gold and telemetry logic depend on successful Silver outputs, Silver instability is a high-leverage reliability concern.
+The Silver stage is a reliability-critical processing step and currently shows repeated instability. Because downstream Gold and telemetry logic depend on successful Silver outputs, Silver instability is a high-leverage reliability concern.
 
 **Risk statement**
 If Silver remains unstable, downstream outputs and telemetry interpretation become unreliable or unavailable.
+
+**Current response**
+- Silver retained as the main operational hotspot in the scorecard
+- issue remains active in monthly review
 
 **Required review**
 - separate contract mismatch from code-defect failures
 - determine recurrence by `error_type`
 - determine whether failures are tied to specific source patterns
 
-**Suggested owner**
-- Technical owner: TBD
+**Closure criteria**
+- no repeated Silver-stage critical failures across review cycle
+- operational review no longer identifies Silver as the dominant hotspot
+- dependency failures into Gold materially reduce
 
 **Next action**
 - group `error_log` by `step_name = build_silver_table`
 - classify failures into schema, implementation, and runtime buckets
-- track recurrence count across runs
+- assign remediation owner
 
 ---
 
@@ -120,28 +141,41 @@ If Silver remains unstable, downstream outputs and telemetry interpretation beco
 **Status**: Open  
 **Severity**: Amber  
 **First observed**: 2026-04-08  
+**Last reviewed**: 2026-04-11  
+**Owner**: TBD  
+**Due date**: TBD  
 **Evidence sources**:
 - `pipeline_run_log.csv`
 - `pipeline_trace.csv`
 - `error_log.csv`
+- `reports/generated/smart_city_observed_metrics.json`
 
 **Observed signal**
-`build_gold_hourly_table` fails with:
+`build_gold_hourly_table` appears with:
+- `build_gold_hourly_table | AnalysisException`: 3
+
+Observed error pattern:
 - `[PATH_NOT_FOUND] ... data/silver/air_quality_long`
 
 **Governance interpretation**
-This indicates that Gold reliability depends directly on Silver artifact availability and that dependency handling is fragile.
+This indicates Gold reliability depends directly on Silver artifact availability and that dependency handling is fragile.
 
 **Risk statement**
 Gold-layer outputs cannot be treated as reliably available when upstream Silver artifacts are missing.
+
+**Current response**
+- dependency fragility remains visible in failure taxonomy and scorecard
+- Gold is not treated as independently healthy while Silver is unstable
 
 **Required review**
 - confirm whether Gold is expected to hard-fail when Silver is unavailable
 - define downstream trust stance when Silver generation fails
 - assess whether failed upstream stages should automatically block Gold claims
 
-**Suggested owner**
-- Technical owner: TBD
+**Closure criteria**
+- dependency-chain failures are not observed across review cycle
+- Gold no longer fails due to missing Silver artifacts
+- dependency policy is documented and accepted
 
 **Next action**
 - document dependency-chain policy between Silver and Gold
@@ -155,37 +189,47 @@ Gold-layer outputs cannot be treated as reliably available when upstream Silver 
 **Status**: Open  
 **Severity**: Amber  
 **First observed**: 2026-04-08  
+**Last reviewed**: 2026-04-11  
+**Owner**: TBD  
+**Due date**: TBD  
 **Evidence sources**:
 - `pipeline_run_log.csv`
 - `pipeline_trace.csv`
 - `error_log.csv`
 - `runtime/error_events.jsonl`
 - `runtime/span_events.jsonl`
+- `reports/generated/smart_city_observed_metrics.json`
 
 **Observed signal**
-`build_telemetry_metrics` shows multiple failure modes, including:
-- unresolved `event_ts`
-- timestamp parsing failure
-- unresolved `ingestion_ts`
+`build_telemetry_metrics`: 3 valid cleaned error rows
+
+Observed failure types include:
+- `AnalysisException`
+- `DateTimeException`
 
 **Governance interpretation**
-The telemetry layer exists and is already useful, but it is not yet fully stable or schema-safe.  
-This means governance can use telemetry evidence, but should do so with a maturity caveat.
+The telemetry layer exists and is already useful, but it is not yet fully stable or schema-safe. Governance can use telemetry evidence, but should do so with a maturity caveat.
 
 **Risk statement**
 The measurement system itself may produce incomplete or inconsistent evidence, especially for freshness and rollup outputs.
+
+**Current response**
+- telemetry instability remains governance-visible
+- not collapsed into generic pipeline failure
 
 **Required review**
 - define canonical telemetry field requirements
 - confirm expected schema for runtime event ingestion
 - review whether curated telemetry outputs need validation before formal board use
 
-**Suggested owner**
-- Observability / technical owner: TBD
+**Closure criteria**
+- telemetry rollup no longer produces repeated cleaned critical failures
+- evidence normalization and rollup outputs are stable across review cycles
+- governance accepts telemetry layer as stable enough for recurring reporting
 
 **Next action**
 - classify telemetry rollup failures separately from core pipeline failures
-- add telemetry-layer stability review to monthly governance cycle
+- add telemetry-layer stability review to each monthly governance cycle
 
 ---
 
@@ -195,37 +239,38 @@ The measurement system itself may produce incomplete or inconsistent evidence, e
 **Status**: Open  
 **Severity**: Red  
 **First observed**: 2026-04-08  
+**Last reviewed**: 2026-04-11  
+**Owner**: TBD  
+**Due date**: TBD  
 **Evidence sources**:
 - `error_log.csv`
 - `runtime/error_events.jsonl`
+- `reports/generated/smart_city_observed_metrics.json`
 
 **Observed signal**
-Reviewed error rows show:
-- `severity = critical`
-- `retryable = false`
-
-Observed error types include:
-- `AnalysisException`
-- `ValueError`
-- `DateTimeException`
-- `NameError`
-- `Py4JJavaError`
+Cleaned analysis shows:
+- valid error rows: 11
+- `critical | false`: 11
 
 **Governance interpretation**
-Critical non-retryable failures should not be treated as low-priority noise.  
-They are direct candidates for exception escalation and, where recurring, incident review.
+Critical non-retryable failures should not be treated as low-priority noise. They are direct candidates for exception escalation and, where recurring, incident review.
 
 **Risk statement**
 Repeated critical non-retryable failures weaken operational trust and suggest unresolved systemic issues.
+
+**Current response**
+- retained as Red exception
+- still active pending ownership and recurrence review
 
 **Required review**
 - count recurrence by `error_type`
 - count recurrence by `step_name`
 - identify which critical failures are implementation-driven versus contract-driven
 
-**Suggested owner**
-- Governance owner: TBD
-- Technical owner: TBD
+**Closure criteria**
+- critical non-retryable recurrence materially reduced
+- high-severity failures have assigned remediation and closure evidence
+- governance no longer considers issue incident-candidate level
 
 **Next action**
 - open incident candidate review for recurring critical failures
@@ -239,64 +284,78 @@ Repeated critical non-retryable failures weaken operational trust and suggest un
 **Status**: Monitoring  
 **Severity**: Amber  
 **First observed**: 2026-04-08  
+**Last reviewed**: 2026-04-11  
+**Owner**: TBD  
+**Due date**: TBD  
 **Evidence sources**:
 - `pipeline_run_log.csv`
 - `pipeline_trace.csv`
+- `reports/generated/smart_city_observed_metrics.json`
 
 **Observed signal**
-Reviewed curated evidence shows signs of measurement inconsistency, including:
-- negative `duration_ms`
-- repeated rollup-related run entries
-- mixed success/failure states across similar rollup sequences
+Cleaned analysis shows:
+- valid run rows: 43
+- filtered invalid run rows: 65
+- valid error rows: 11
+- filtered invalid error rows: 66
 
 **Governance interpretation**
-The issue is not only pipeline reliability, but evidence reliability.  
-If the telemetry history is not normalized, scorecard and board interpretation may become misleading.
+The issue is not only pipeline reliability, but evidence reliability. If telemetry history is not normalized, scorecard and board interpretation may become misleading.
 
 **Risk statement**
 Governance conclusions may be distorted unless run history is normalized before review.
+
+**Current response**
+- cleaned analysis used in place of raw blank-row counts
+- evidence-integrity caution retained in scorecard
 
 **Required review**
 - define run deduplication or normalization policy
 - determine how repeated rollup runs should be represented in scorecards
 - avoid simple raw-count interpretation without cleanup rules
 
-**Suggested owner**
-- Governance owner: TBD
-- Observability owner: TBD
+**Closure criteria**
+- malformed or invalid telemetry-derived rows materially reduce
+- normalization policy is documented and applied consistently
+- governance can use recurring metrics without major cleanup caveat
 
 **Next action**
 - define evidence normalization rules before formal recurring board reporting
-- review whether negative duration rows should be excluded or separately flagged
+- review whether invalid rows reflect multiline error rendering, export artifact, or upstream telemetry formatting
 
 ---
 
 ## Monitoring items
 
-## SC-MON-001 — Quality metrics look healthy in reviewed sample
+## SC-MON-001 — Quality metrics look healthy in current cleaned snapshot
 **Category**: Quality monitoring  
 **Status**: Monitoring  
-**Severity**: Green / Amber pending aggregation  
+**Severity**: Green  
+**Last reviewed**: 2026-04-11  
+**Owner**: TBD  
+**Due date**: TBD  
 **Evidence sources**:
 - `quality_metrics_daily.csv`
+- `reports/generated/smart_city_observed_metrics.json`
 
 **Observed signal**
-Sample rows show:
-- `pass_rate = 1.0`
-- `null_rate = 0.0`
-- `duplicate_rate = 0.0`
-- `stale_rate = 0.0`
-- `outlier_rate = 0.0`
-- `flagged_rate = 0.0`
-- `rejected_rate = 0.0`
-- `quality_status = pass`
+Cleaned analysis shows:
+- valid quality rows: 5834
+- `quality_status = pass`: 5834
+- avg `pass_rate = 1.0`
+- avg `rejected_rate = 0.0`
+- avg `duplicate_rate = 0.0`
+- avg `flagged_rate = 0.0`
 
 **Interpretation**
-This is promising, but sample evidence alone is not enough to declare full quality health across the review period.
+This is a strong positive signal for current quality posture.
+
+**Closure criteria**
+- not applicable; monitoring item remains until quality materially degrades or review model changes
 
 **Next action**
-- aggregate by `metric_date`, `city`, and `pollutant`
-- confirm whether strong sample quality generalizes across the full evidence set
+- continue monitoring across future review cycles
+- ensure strong quality posture is not used to mask freshness risk
 
 ---
 
@@ -310,24 +369,22 @@ This is promising, but sample evidence alone is not enough to declare full quali
 | SC-EX-004 | Telemetry rollup correctness instability | Observability / telemetry | Open | Amber |
 | SC-EX-005 | Critical non-retryable failures present in error evidence | Incident candidate | Open | Red |
 | SC-EX-006 | Evidence integrity concerns in curated run history | Evidence integrity | Monitoring | Amber |
-| SC-MON-001 | Quality metrics look healthy in reviewed sample | Quality monitoring | Monitoring | Green / Amber |
+| SC-MON-001 | Quality metrics look healthy in current cleaned snapshot | Quality monitoring | Monitoring | Green |
 
 ---
 
 ## Recommended next governance actions
 
 ### Immediate
-- confirm whether freshness exception should remain Red after full aggregation
-- count recurring critical errors by `step_name` and `error_type`
-- separate Silver failures into:
-  - schema contract issues
-  - implementation defects
-  - runtime/platform issues
+- assign owners for all open exceptions
+- confirm whether freshness exception remains Red after next snapshot
+- count recurring critical failures by `step_name` and `error_type`
+- separate Silver failures into schema, implementation, and runtime buckets
 
 ### Before next review cycle
-- populate `scorecards/smart_city_scorecard.yaml` with observed values
-- align exception register with `smart_city_exception_rules.yaml`
+- align exception register with refreshed scorecard values
 - define evidence normalization rules for repeated rollup runs
+- confirm telemetry rollup stability threshold for governance use
 
 ### Before board reporting
 - confirm whether telemetry rollup evidence is stable enough for executive summary use
@@ -347,4 +404,4 @@ The current register shows that the domain’s key governance concerns are not o
 - critical non-retryable failure recurrence
 - evidence integrity concerns
 
-This register should now become the working bridge between raw telemetry and formal governance review.
+This register should remain the working bridge between raw telemetry and formal governance review.
