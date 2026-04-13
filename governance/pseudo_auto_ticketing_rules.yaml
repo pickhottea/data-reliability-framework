@@ -1,0 +1,346 @@
+version: v1
+status: draft
+updated_at: 2026-04-11
+
+purpose: >
+  Define lightweight governance-level pseudo auto-ticketing trigger rules for
+  telemetry-driven review. These rules do not create real enterprise tickets.
+  They generate governance action candidates, incident candidates, and
+  corrective-action candidates from reviewed evidence.
+
+scope:
+  repository: data-reliability-framework
+  domain_mode: pilot
+  initial_domain: smart_city
+  primary_inputs:
+    - reports/generated/smart_city_observed_metrics.json
+    - scorecards/smart_city_scorecard.yaml
+    - exceptions/smart_city_exception_register.md
+    - governance/monthly_review_smart_city.md
+
+candidate_output:
+  format: json
+  target_path: reports/generated/ticket_candidates.json
+  summary_output_optional: reports/ticket_candidates_summary.md
+
+defaults:
+  candidate_status: candidate_open
+  suggested_owner: TBD
+  suggested_due_date: TBD
+  runbook_link: null
+  review_required: true
+
+candidate_types:
+  governance_ticket:
+    description: >
+      Governance follow-up action for a recurring or material issue that needs
+      owner assignment, remediation tracking, or structured review.
+  incident_candidate:
+    description: >
+      Escalation-oriented candidate generated when severity or recurrence
+      suggests incident-style treatment may be warranted.
+  timeliness_corrective_action:
+    description: >
+      Action candidate focused on stale-data, lag, or timeliness failures.
+  evidence_integrity_improvement:
+    description: >
+      Action candidate focused on evidence cleanup, normalization, or
+      interpretation reliability.
+
+severity_mapping:
+  red:
+    candidate_priority: high
+  amber_red:
+    candidate_priority: high
+  amber:
+    candidate_priority: medium
+  green:
+    candidate_priority: low
+
+rules:
+
+  - rule_id: TC-001
+    title: Freshness red condition
+    enabled: true
+    domain_id: smart_city
+    candidate_type: timeliness_corrective_action
+    severity: red
+    trigger_source: scorecard_and_observed_metrics
+    description: >
+      Generate a timeliness corrective-action candidate when freshness is red
+      or when all valid reviewed freshness rows are stale.
+    conditions:
+      any_of:
+        - source: scorecard
+          path: dimensions.freshness.status
+          operator: equals
+          value: red
+        - source: observed_metrics_json
+          path: freshness.freshness_status_counts.stale
+          operator: greater_than_or_equal
+          value: 1
+    linked_exception_ids:
+      - SC-EX-001
+    linked_scorecard_dimensions:
+      - freshness
+    evidence_refs:
+      - reports/generated/smart_city_observed_metrics.json
+      - scorecards/smart_city_scorecard.yaml
+      - exceptions/smart_city_exception_register.md
+    suggested_action: >
+      Review stale freshness conditions by city and pollutant, assign an owner,
+      and determine whether downstream trust claims should be restricted until
+      timeliness improves.
+    suggested_title: >
+      Freshness red condition requires corrective action and trust-position review
+
+  - rule_id: TC-002
+    title: Critical non-retryable error recurrence
+    enabled: true
+    domain_id: smart_city
+    candidate_type: incident_candidate
+    severity: red
+    trigger_source: observed_metrics_json
+    description: >
+      Generate an incident candidate when critical non-retryable failures meet
+      or exceed the configured threshold.
+    conditions:
+      all_of:
+        - source: observed_metrics_json
+          path: error_log.severity_retryable.critical|false
+          operator: greater_than_or_equal
+          value: 5
+    linked_exception_ids:
+      - SC-EX-005
+    linked_scorecard_dimensions:
+      - incident_and_exception_management
+    evidence_refs:
+      - reports/generated/smart_city_observed_metrics.json
+      - scorecards/smart_city_scorecard.yaml
+      - exceptions/smart_city_exception_register.md
+    suggested_action: >
+      Open incident-style review of recurring critical non-retryable failures
+      and group recurrence by step_name and error_type.
+    suggested_title: >
+      Critical non-retryable failure recurrence requires incident review
+
+  - rule_id: TC-003
+    title: Silver-stage instability recurrence
+    enabled: true
+    domain_id: smart_city
+    candidate_type: governance_ticket
+    severity: amber
+    trigger_source: observed_metrics_json
+    description: >
+      Generate a governance ticket when build_silver_table remains the dominant
+      cleaned failure hotspot or crosses the recurrence threshold.
+    conditions:
+      all_of:
+        - source: observed_metrics_json
+          path: error_log.by_step_name.build_silver_table
+          operator: greater_than_or_equal
+          value: 3
+    linked_exception_ids:
+      - SC-EX-002
+    linked_scorecard_dimensions:
+      - operational_reliability
+    evidence_refs:
+      - reports/generated/smart_city_observed_metrics.json
+      - scorecards/smart_city_scorecard.yaml
+      - exceptions/smart_city_exception_register.md
+    suggested_action: >
+      Review recurring Silver-stage failures by category, assign remediation
+      ownership, and confirm whether issues are contract-driven,
+      implementation-driven, or runtime-driven.
+    suggested_title: >
+      Repeated Silver-stage instability requires remediation ownership
+
+  - rule_id: TC-004
+    title: Telemetry rollup instability
+    enabled: true
+    domain_id: smart_city
+    candidate_type: governance_ticket
+    severity: amber
+    trigger_source: observed_metrics_json
+    description: >
+      Generate a governance ticket when telemetry metric generation failures
+      remain present above the configured threshold.
+    conditions:
+      all_of:
+        - source: observed_metrics_json
+          path: error_log.by_step_name.build_telemetry_metrics
+          operator: greater_than_or_equal
+          value: 2
+    linked_exception_ids:
+      - SC-EX-004
+    linked_scorecard_dimensions:
+      - incident_and_exception_management
+    evidence_refs:
+      - reports/generated/smart_city_observed_metrics.json
+      - scorecards/smart_city_scorecard.yaml
+      - exceptions/smart_city_exception_register.md
+    suggested_action: >
+      Review telemetry rollup correctness, validate field expectations, and
+      determine whether telemetry outputs are stable enough for recurring
+      executive or board reporting.
+    suggested_title: >
+      Telemetry rollup instability requires observability control review
+
+  - rule_id: TC-005
+    title: Evidence integrity concern
+    enabled: true
+    domain_id: smart_city
+    candidate_type: evidence_integrity_improvement
+    severity: amber
+    trigger_source: observed_metrics_json
+    description: >
+      Generate an evidence-integrity improvement candidate when filtered invalid
+      rows remain materially present in run or error analysis.
+    conditions:
+      any_of:
+        - source: observed_metrics_json
+          path: run_status.filtered_invalid_rows
+          operator: greater_than_or_equal
+          value: 20
+        - source: observed_metrics_json
+          path: error_log.filtered_invalid_rows
+          operator: greater_than_or_equal
+          value: 20
+    linked_exception_ids:
+      - SC-EX-006
+    linked_scorecard_dimensions:
+      - evidence_integrity
+    evidence_refs:
+      - reports/generated/smart_city_observed_metrics.json
+      - scorecards/smart_city_scorecard.yaml
+      - exceptions/smart_city_exception_register.md
+    suggested_action: >
+      Improve telemetry-derived CSV normalization, define row filtering rules,
+      and validate evidence quality before recurring management or board review.
+    suggested_title: >
+      Evidence integrity weakness requires normalization improvement
+
+  - rule_id: TC-006
+    title: Gold dependency-chain fragility
+    enabled: true
+    domain_id: smart_city
+    candidate_type: governance_ticket
+    severity: amber
+    trigger_source: observed_metrics_json
+    description: >
+      Generate a governance ticket when build_gold_hourly_table dependency
+      failures remain materially present.
+    conditions:
+      all_of:
+        - source: observed_metrics_json
+          path: error_log.by_step_name.build_gold_hourly_table
+          operator: greater_than_or_equal
+          value: 2
+    linked_exception_ids:
+      - SC-EX-003
+    linked_scorecard_dimensions:
+      - operational_reliability
+    evidence_refs:
+      - reports/generated/smart_city_observed_metrics.json
+      - exceptions/smart_city_exception_register.md
+      - reports/smart_city_failure_taxonomy.md
+    suggested_action: >
+      Review dependency-chain handling between Silver and Gold and define
+      whether downstream claims must be automatically blocked when Silver
+      artifacts are missing.
+    suggested_title: >
+      Gold dependency-chain fragility requires dependency policy review
+
+  - rule_id: TC-007
+    title: Open red exception without ownership
+    enabled: true
+    domain_id: smart_city
+    candidate_type: governance_ticket
+    severity: red
+    trigger_source: exception_register_review
+    description: >
+      Generate a governance action candidate when an open red exception remains
+      without assigned owner or due date.
+    conditions:
+      all_of:
+        - source: exception_register
+          path: open_red_exception_without_owner_or_due_date
+          operator: equals
+          value: true
+    linked_exception_ids:
+      - SC-EX-001
+      - SC-EX-005
+    linked_scorecard_dimensions:
+      - freshness
+      - incident_and_exception_management
+    evidence_refs:
+      - exceptions/smart_city_exception_register.md
+      - governance/monthly_review_smart_city.md
+    suggested_action: >
+      Assign ownership and due date to open red exceptions before the next
+      formal management review checkpoint.
+    suggested_title: >
+      Open red exception requires owner and due-date assignment
+
+  - rule_id: TC-008
+    title: Management review action required
+    enabled: true
+    domain_id: smart_city
+    candidate_type: governance_ticket
+    severity: amber
+    trigger_source: management_review
+    description: >
+      Generate a governance candidate when management review explicitly records
+      an action-needed or escalation-needed outcome.
+    conditions:
+      any_of:
+        - source: management_review
+          path: action_required
+          operator: equals
+          value: true
+        - source: management_review
+          path: escalation_required
+          operator: equals
+          value: true
+    linked_exception_ids: []
+    linked_scorecard_dimensions: []
+    evidence_refs:
+      - governance/monthly_review_smart_city.md
+      - governance/management_review_template.md
+    suggested_action: >
+      Convert management-review follow-up into a structured candidate with
+      owner, due date, supporting evidence, and linked review rationale.
+    suggested_title: >
+      Management review follow-up requires tracked governance action
+
+generation_rules:
+  candidate_id_format: "GT-{year}-{sequence}"
+  deduplicate_on:
+    - domain_id
+    - candidate_type
+    - suggested_title
+    - trigger_reason
+  include_fields:
+    - candidate_id
+    - domain_id
+    - candidate_type
+    - title
+    - trigger_source
+    - trigger_reason
+    - severity
+    - linked_exception_ids
+    - linked_scorecard_dimensions
+    - evidence_refs
+    - suggested_owner
+    - suggested_due_date
+    - suggested_action
+    - runbook_link
+    - status
+
+future_extensions:
+  - add multi-domain support
+  - add recurrence_across_review_cycles logic
+  - add scorecard deterioration logic
+  - add direct corrective-action log integration
+  - add optional Jira, GitHub Issues, or Linear mapping
+  - add runbook-link support from implementation repositories
